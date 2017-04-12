@@ -74,8 +74,12 @@ func TestAccAWSAutoScalingGroup_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"aws_autoscaling_group.bar", "protect_from_scale_in", "true"),
 					testLaunchConfigurationName("aws_autoscaling_group.bar", &lc),
-					testAccCheckAutoscalingTags(&group.Tags, "Bar", map[string]interface{}{
-						"value":               "bar-foo",
+					testAccCheckAutoscalingTags(&group.Tags, "FromTagChanged", map[string]interface{}{
+						"value":               "value1changed",
+						"propagate_at_launch": true,
+					}),
+					testAccCheckAutoscalingTags(&group.Tags, "FromTags1", map[string]interface{}{
+						"value":               "value2",
 						"propagate_at_launch": true,
 					}),
 				),
@@ -164,8 +168,16 @@ func TestAccAWSAutoScalingGroup_tags(t *testing.T) {
 				Config: testAccAWSAutoScalingGroupConfig(randName),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckAWSAutoScalingGroupExists("aws_autoscaling_group.bar", &group),
-					testAccCheckAutoscalingTags(&group.Tags, "Foo", map[string]interface{}{
-						"value":               "foo-bar",
+					testAccCheckAutoscalingTags(&group.Tags, "FromTag", map[string]interface{}{
+						"value":               "value1",
+						"propagate_at_launch": true,
+					}),
+					testAccCheckAutoscalingTags(&group.Tags, "FromTags1", map[string]interface{}{
+						"value":               "value2",
+						"propagate_at_launch": true,
+					}),
+					testAccCheckAutoscalingTags(&group.Tags, "FromTags2", map[string]interface{}{
+						"value":               "value3",
 						"propagate_at_launch": true,
 					}),
 				),
@@ -176,8 +188,12 @@ func TestAccAWSAutoScalingGroup_tags(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckAWSAutoScalingGroupExists("aws_autoscaling_group.bar", &group),
 					testAccCheckAutoscalingTagNotExists(&group.Tags, "Foo"),
-					testAccCheckAutoscalingTags(&group.Tags, "Bar", map[string]interface{}{
-						"value":               "bar-foo",
+					testAccCheckAutoscalingTags(&group.Tags, "FromTagChanged", map[string]interface{}{
+						"value":               "value1changed",
+						"propagate_at_launch": true,
+					}),
+					testAccCheckAutoscalingTags(&group.Tags, "FromTags1", map[string]interface{}{
+						"value":               "value2",
 						"propagate_at_launch": true,
 					}),
 				),
@@ -821,10 +837,23 @@ resource "aws_autoscaling_group" "bar" {
   launch_configuration = "${aws_launch_configuration.foobar.name}"
 
   tag {
-    key = "Foo"
-    value = "foo-bar"
+    key = "FromTag"
+    value = "value1"
     propagate_at_launch = true
   }
+
+  tags = [
+    {
+      key = "FromTags1"
+      value = "value2"
+      propagate_at_launch = true
+    },
+    {
+      key = "FromTags2"
+      value = "value3"
+      propagate_at_launch = true
+    },
+  ]
 }
 `, name, name)
 }
@@ -856,10 +885,18 @@ resource "aws_autoscaling_group" "bar" {
   launch_configuration = "${aws_launch_configuration.new.name}"
 
   tag {
-    key = "Bar"
-    value = "bar-foo"
+    key = "FromTagChanged"
+    value = "value1changed"
     propagate_at_launch = true
   }
+
+  tags = [
+    {
+      key = "FromTags1"
+      value = "value2"
+      propagate_at_launch = true
+    },
+  ]
 }
 `, name)
 }

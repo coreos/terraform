@@ -229,7 +229,13 @@ func resourceAwsAutoscalingGroup() *schema.Resource {
 				},
 			},
 
-			"tag": autoscalingTagsSchema(),
+			"tag": autoscalingTagSchema(),
+
+			"tags": &schema.Schema{
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem:     &schema.Schema{Type: schema.TypeMap},
+			},
 		},
 	}
 }
@@ -325,9 +331,15 @@ func resourceAwsAutoscalingGroupCreate(d *schema.ResourceData, meta interface{})
 		createOpts.AvailabilityZones = expandStringList(v.(*schema.Set).List())
 	}
 
+	resourceID := d.Get("name").(string)
 	if v, ok := d.GetOk("tag"); ok {
 		createOpts.Tags = autoscalingTagsFromMap(
-			setToMapByKey(v.(*schema.Set), "key"), d.Get("name").(string))
+			setToMapByKey(v.(*schema.Set), "key"), resourceID)
+	}
+
+	if v, ok := d.GetOk("tags"); ok {
+		tags := autoscalingTagsFromList(v.([]interface{}), resourceID)
+		createOpts.Tags = append(createOpts.Tags, tags...)
 	}
 
 	if v, ok := d.GetOk("default_cooldown"); ok {
@@ -437,7 +449,33 @@ func resourceAwsAutoscalingGroupRead(d *schema.ResourceData, meta interface{}) e
 	d.Set("max_size", g.MaxSize)
 	d.Set("placement_group", g.PlacementGroup)
 	d.Set("name", g.AutoScalingGroupName)
-	d.Set("tag", autoscalingTagDescriptionsToSlice(g.Tags))
+
+	var tagList, tagsList []*autoscaling.TagDescription
+	if v, ok := d.GetOk("tag"); ok {
+		tags := setToMapByKey(v.(*schema.Set), "key")
+		for _, t := range g.Tags {
+			if _, ok := tags[*t.Key]; ok {
+				tagList = append(tagList, t)
+			}
+		}
+		d.Set("tag", autoscalingTagDescriptionsToSlice(tagList))
+	}
+
+	if v, ok := d.GetOk("tags"); ok {
+		tags := map[string]struct{}{}
+		for _, tag := range v.([]interface{}) {
+			attr := tag.(map[string]interface{})
+			tags[attr["key"].(string)] = struct{}{}
+		}
+
+		for _, t := range g.Tags {
+			if _, ok := tags[*t.Key]; ok {
+				tagsList = append(tagsList, t)
+			}
+		}
+		d.Set("tags", autoscalingTagDescriptionsToSlice(tagsList))
+	}
+
 	d.Set("vpc_zone_identifier", strings.Split(*g.VPCZoneIdentifier, ","))
 	d.Set("protect_from_scale_in", g.NewInstancesProtectedFromScaleIn)
 
@@ -529,8 +567,14 @@ func resourceAwsAutoscalingGroupUpdate(d *schema.ResourceData, meta interface{})
 
 	if err := setAutoscalingTags(conn, d); err != nil {
 		return err
-	} else {
+	}
+
+	if d.HasChange("tag") {
 		d.SetPartial("tag")
+	}
+
+	if d.HasChange("tags") {
+		d.SetPartial("tags")
 	}
 
 	log.Printf("[DEBUG] AutoScaling Group update configuration: %#v", opts)

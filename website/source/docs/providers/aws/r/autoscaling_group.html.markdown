@@ -52,11 +52,23 @@ EOF
     propagate_at_launch = true
   }
 
-  tag {
-    key                 = "lorem"
-    value               = "ipsum"
-    propagate_at_launch = false
-  }
+  tags = [
+    {
+      key                 = "explicit1"
+      value               = "value1"
+      propagate_at_launch = true
+    },
+    {
+      key                 = "explicit2"
+      value               = "value2"
+      propagate_at_launch = true
+    },
+  ]
+
+  tags = ["${list(
+    map("key", "interpolation1", "value", "value3", "propagate_at_launch", true),
+    map("key", "interpolation2", "value", "value4", "propagate_at_launch", true)
+  )}"]
 }
 ```
 
@@ -96,6 +108,7 @@ Application Load Balancing
 * `suspended_processes` - (Optional) A list of processes to suspend for the AutoScaling Group. The allowed values are `Launch`, `Terminate`, `HealthCheck`, `ReplaceUnhealthy`, `AZRebalance`, `AlarmNotification`, `ScheduledActions`, `AddToLoadBalancer`.
 Note that if you suspend either the `Launch` or `Terminate` process types, it can prevent your autoscaling group from functioning properly.
 * `tag` (Optional) A list of tag blocks. Tags documented below.
+* `tags` (Optional) A list of tag blocks (maps). Tags documented below.
 * `placement_group` (Optional) The name of the placement group into which you'll launch your instances, if any.
 * `metrics_granularity` - (Optional) The granularity to associate with the metrics to collect. The only valid value is `1Minute`. Default is `1Minute`.
 * `enabled_metrics` - (Optional) A list of metrics to collect. The allowed values are `GroupMinSize`, `GroupMaxSize`, `GroupDesiredCapacity`, `GroupInServiceInstances`, `GroupPendingInstances`, `GroupStandbyInstances`, `GroupTerminatingInstances`, `GroupTotalInstances`.
@@ -123,6 +136,9 @@ Tags support the following:
 * `value` - (Required) Value
 * `propagate_at_launch` - (Required) Enables propagation of the tag to
    Amazon EC2 instances launched via this ASG
+
+Note that in addition to the `tag` field the `tags` field accepts a list of maps containing the above field names as keys and their respective values.
+This allows the construction of custom tags using interpolation.
 
 ## Attributes Reference
 

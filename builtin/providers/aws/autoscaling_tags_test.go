@@ -20,24 +20,28 @@ func TestDiffAutoscalingTags(t *testing.T) {
 		{
 			Old: map[string]interface{}{
 				"Name": map[string]interface{}{
+					"key":                 "Name",
 					"value":               "bar",
 					"propagate_at_launch": true,
 				},
 			},
 			New: map[string]interface{}{
 				"DifferentTag": map[string]interface{}{
+					"key":                 "DifferentTag",
 					"value":               "baz",
 					"propagate_at_launch": true,
 				},
 			},
 			Create: map[string]interface{}{
 				"DifferentTag": map[string]interface{}{
+					"key":                 "DifferentTag",
 					"value":               "baz",
 					"propagate_at_launch": true,
 				},
 			},
 			Remove: map[string]interface{}{
 				"Name": map[string]interface{}{
+					"key":                 "Name",
 					"value":               "bar",
 					"propagate_at_launch": true,
 				},
@@ -48,24 +52,28 @@ func TestDiffAutoscalingTags(t *testing.T) {
 		{
 			Old: map[string]interface{}{
 				"Name": map[string]interface{}{
+					"key":                 "Name",
 					"value":               "bar",
 					"propagate_at_launch": true,
 				},
 			},
 			New: map[string]interface{}{
 				"Name": map[string]interface{}{
+					"key":                 "Name",
 					"value":               "baz",
 					"propagate_at_launch": false,
 				},
 			},
 			Create: map[string]interface{}{
 				"Name": map[string]interface{}{
+					"key":                 "Name",
 					"value":               "baz",
 					"propagate_at_launch": false,
 				},
 			},
 			Remove: map[string]interface{}{
 				"Name": map[string]interface{}{
+					"key":                 "Name",
 					"value":               "bar",
 					"propagate_at_launch": true,
 				},
