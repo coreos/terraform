@@ -132,14 +132,51 @@ func resourceAwsEipRead(d *schema.ResourceData, meta interface{}) error {
 		"[DEBUG] EIP describe configuration: %s (domain: %s)",
 		req, domain)
 
-	describeAddresses, err := ec2conn.DescribeAddresses(req)
-	if err != nil {
-		if ec2err, ok := err.(awserr.Error); ok && (ec2err.Code() == "InvalidAllocationID.NotFound" || ec2err.Code() == "InvalidAddress.NotFound") {
+	var (
+		err               error
+		describeAddresses *ec2.DescribeAddressesOutput
+	)
+
+	f := func() *resource.RetryError {
+		describeAddresses, err = ec2conn.DescribeAddresses(req)
+		if err == nil {
+			return nil
+		}
+
+		if ec2err, ok := err.(awserr.Error); ok {
+			switch ec2err.Code() {
+			case "InvalidAllocationID.NotFound":
+				return resource.RetryableError(ec2err)
+			case "InvalidAddress.NotFound":
+				return resource.RetryableError(ec2err)
+			}
+		}
+
+		return resource.NonRetryableError(err)
+	}
+
+	switch d.IsNewResource() {
+	case true:
+		if err = resource.Retry(15*time.Minute, f); err != nil {
+			return fmt.Errorf("Error retrieving EIP: %s", err)
+		}
+
+	default:
+		retryErr := f()
+
+		if retryErr == nil {
+			// addresses have been found, continue execution
+			break
+		}
+
+		if retryErr.Retryable {
+			// error is retryable (not found), hence set the id to empty string (unknown) and return
 			d.SetId("")
 			return nil
 		}
 
-		return fmt.Errorf("Error retrieving EIP: %s", err)
+		// something else went wrong
+		return fmt.Errorf("Error retrieving EIP: %s", retryErr.Err)
 	}
 
 	// Verify AWS returned our EIP
