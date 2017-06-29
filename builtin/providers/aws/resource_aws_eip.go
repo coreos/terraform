@@ -114,6 +114,27 @@ func resourceAwsEipCreate(d *schema.ResourceData, meta interface{}) error {
 	return resourceAwsEipUpdate(d, meta)
 }
 
+func describeAddressesFunc(conn *ec2.EC2, req *ec2.DescribeAddressesInput) resource.StateRefreshFunc {
+	return func() (interface{}, string, error) {
+		describeAddresses, err := conn.DescribeAddresses(req)
+
+		if err == nil {
+			return describeAddresses, "found", nil
+		}
+
+		if ec2err, ok := err.(awserr.Error); ok {
+			switch ec2err.Code() {
+			case "InvalidAllocationID.NotFound":
+				return nil, "notfound", nil
+			case "InvalidAddress.NotFound":
+				return nil, "notfound", nil
+			}
+		}
+
+		return nil, "notfound", err
+	}
+}
+
 func resourceAwsEipRead(d *schema.ResourceData, meta interface{}) error {
 	ec2conn := meta.(*AWSClient).ec2conn
 
@@ -132,15 +153,21 @@ func resourceAwsEipRead(d *schema.ResourceData, meta interface{}) error {
 		"[DEBUG] EIP describe configuration: %s (domain: %s)",
 		req, domain)
 
-	describeAddresses, err := ec2conn.DescribeAddresses(req)
-	if err != nil {
-		if ec2err, ok := err.(awserr.Error); ok && (ec2err.Code() == "InvalidAllocationID.NotFound" || ec2err.Code() == "InvalidAddress.NotFound") {
-			d.SetId("")
-			return nil
-		}
+	stateConf := &resource.StateChangeConf{
+		Pending:        []string{"notfound"},
+		Target:         []string{"found"},
+		Timeout:        15 * time.Minute,
+		Delay:          10 * time.Second,
+		Refresh:        describeAddressesFunc(ec2conn, req),
+		NotFoundChecks: 90,
+	}
 
+	res, err := stateConf.WaitForState()
+	if err != nil {
 		return fmt.Errorf("Error retrieving EIP: %s", err)
 	}
+
+	describeAddresses := res.(*ec2.DescribeAddressesOutput)
 
 	// Verify AWS returned our EIP
 	if len(describeAddresses.Addresses) != 1 ||
@@ -248,10 +275,6 @@ func resourceAwsEipDelete(d *schema.ResourceData, meta interface{}) error {
 
 	if err := resourceAwsEipRead(d, meta); err != nil {
 		return err
-	}
-	if d.Id() == "" {
-		// This might happen from the read
-		return nil
 	}
 
 	// If we are attached to an instance or interface, detach first.
